@@ -11,6 +11,7 @@ from app.api.auth import router as auth_router
 from app.api.documents import router as documents_router
 from app.api.chat import router as chat_router
 from app.config.settings import settings
+import app.database.base  # Ensures all ORM model relationships are registered at startup
 
 # Setup logging configuration
 logging.basicConfig(
