@@ -156,3 +156,74 @@ def delete_document(
     db.delete(doc)
     db.commit()
     return
+
+
+@router.get("/{document_id}/status")
+def get_document_status(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Fetches the real-time processing status, progress percentage, and metrics for a document."""
+    doc = db.query(Document).filter(
+        Document.id == document_id,
+        Document.uploaded_by == current_user.id
+    ).first()
+    
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found or access denied."
+        )
+
+    # Get the latest processing job
+    job = db.query(ProcessingJob).filter(
+        ProcessingJob.document_id == document_id
+    ).order_by(ProcessingJob.created_at.desc()).first()
+
+    if not job:
+        return {
+            "document_id": document_id,
+            "status": doc.status,
+            "progress": 100 if doc.status == "completed" else 0,
+            "current_step": "No active job",
+            "metrics": {}
+        }
+
+    # Map job status to progress percentage
+    status_progress = {
+        "queued": 10,
+        "parsing": 30,
+        "cleaning": 50,
+        "chunking": 70,
+        "embedding": 85,
+        "indexing": 95,
+        "completed": 100,
+        "failed": 100
+    }
+    
+    status_steps = {
+        "queued": "Queued for processing",
+        "parsing": "Extracting raw text from document",
+        "cleaning": "Standardizing Unicode and layout",
+        "chunking": "Splitting text into recursive blocks",
+        "embedding": "Generating vector representation weights",
+        "indexing": "Saving to Qdrant vector database",
+        "completed": "Document successfully indexed",
+        "failed": f"Failed: {job.error_message or 'Unknown error'}"
+    }
+
+    progress = status_progress.get(job.status, 0)
+    current_step = status_steps.get(job.status, "Processing")
+    
+    # Load metrics from metadata if completed
+    metrics = doc.metadata_json.get("ingestion_metrics", {}) if doc.metadata_json else {}
+
+    return {
+        "document_id": document_id,
+        "status": job.status,
+        "progress": progress,
+        "current_step": current_step,
+        "metrics": metrics
+    }
+

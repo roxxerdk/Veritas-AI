@@ -1,0 +1,29 @@
+# Python virtual environment & cache
+backend/.venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases and document storage paths
+data/
+backend/data/
+
+# Javascript dependencies & build targets
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Secret config tokens
+.env
+backend/.env
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
