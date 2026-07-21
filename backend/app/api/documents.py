@@ -2,7 +2,7 @@ import hashlib
 import os
 import shutil
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
@@ -10,6 +10,8 @@ from app.database.session import get_db
 from app.models.document import Document, ProcessingJob
 from app.models.user import User
 from app.schemas.document import DocumentResponse
+from app.services.pipeline.ingestion_pipeline import IngestionPipeline
+from app.services.vectorstore.qdrant_service import QdrantService
 
 router = APIRouter(
     prefix="/documents",
@@ -26,13 +28,20 @@ def calculate_checksum(file_content: bytes) -> str:
     return hashlib.sha256(file_content).hexdigest()
 
 
+def run_ingestion_pipeline(doc_id: int):
+    """Worker helper to execute the background ingestion pipeline."""
+    pipeline = IngestionPipeline(doc_id)
+    pipeline.process()
+
+
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Uploads a new document, verifies checksum, and saves it locally."""
+    """Uploads a new document, saves it, and spawns the background ingestion pipeline."""
     # Check if file format is supported
     filename = file.filename
     file_ext = os.path.splitext(filename)[1].lower().replace(".", "")
@@ -58,7 +67,6 @@ async def upload_document(
         )
 
     # Define local file storage path
-    # Using checksum as filename locally to prevent collisions with original filenames
     local_filename = f"{checksum}.{file_ext}"
     storage_path = os.path.join(UPLOAD_DIR, local_filename)
 
@@ -93,7 +101,10 @@ async def upload_document(
     )
     db.add(new_job)
     db.commit()
-    db.refresh(new_doc)  # Refresh doc to include child jobs relationship
+    db.refresh(new_doc)
+
+    # Dispatch ingestion task asynchronously
+    background_tasks.add_task(run_ingestion_pipeline, new_doc.id)
 
     return new_doc
 
@@ -113,7 +124,7 @@ def delete_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Deletes a document from the local store and database."""
+    """Deletes a document from local store, database, and Qdrant vector index."""
     # Look up document by ID and verify ownership
     doc = db.query(Document).filter(
         Document.id == document_id,
@@ -130,9 +141,16 @@ def delete_document(
     if os.path.exists(doc.storage_path):
         try:
             os.remove(doc.storage_path)
-        except Exception as e:
-            # Log error but continue database deletion
+        except Exception:
             pass
+
+    # Clear vectors from Qdrant
+    try:
+        qdrant_service = QdrantService()
+        qdrant_service.delete_document_vectors(doc.id)
+    except Exception:
+        # Continue db deletion even if vector store fails
+        pass
 
     # Delete Document from DB (cascades deletes to jobs and chunks)
     db.delete(doc)
