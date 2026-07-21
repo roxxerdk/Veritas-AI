@@ -1,13 +1,44 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    # App Settings
     APP_NAME: str = "Veritas AI"
     APP_VERSION: str = "1.0.0"
+    ENV: str = "development"
     DEBUG: bool = True
+
+    # Security
+    JWT_SECRET: str = Field(default="supersecretjwtkeyforveritasaiplatform2026!")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
+    # PostgreSQL Database
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_DB: str = "veritas_db"
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+
+    # Redis Cache
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+
+    # Qdrant Vector DB
+    QDRANT_HOST: str = "localhost"
+    QDRANT_PORT: int = 6333
+
+    # Gemini API Key
+    GEMINI_API_KEY: str = Field(default="")
+
+    def get_database_url(self) -> str:
+        """Returns the PostgreSQL connection string."""
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     model_config = SettingsConfigDict(
         env_file=".env",
+        env_file_encoding="utf-8",
         extra="ignore"
     )
 

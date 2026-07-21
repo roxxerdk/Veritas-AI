@@ -9,7 +9,7 @@ logger = logging.getLogger("veritas-ai.db")
 
 # Create SQLAlchemy engine with 2.0 future mode and logging enabled during debug
 engine = create_engine(
-    settings.database_url,
+    settings.get_database_url(),
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
