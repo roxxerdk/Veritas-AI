@@ -64,13 +64,16 @@ def get_db():
     # Temporary placeholder. Once database/session.py is created, we import it.
     # Yields None if DB is not set up yet to avoid crashing the server during early setup.
     try:
-        from app.database.session import SessionLocal
+        import importlib
+
+        session_module = importlib.import_module("app.database.session")
+        SessionLocal = getattr(session_module, "SessionLocal")
         db = SessionLocal()
         try:
             yield db
         finally:
             db.close()
-    except ImportError:
+    except (ImportError, ModuleNotFoundError):
         yield None
 
 
