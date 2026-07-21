@@ -1,95 +1,151 @@
-# Improvised Implementation Plan: Ingestion & Hybrid Retrieval Services
+# Improvised Implementation Plan: LangGraph Self-Correcting Multi-Agent RAG
 
-Turn uploaded documents into searchable knowledge through an asynchronous pipeline (parsing -> cleaning -> chunking -> embedding -> indexing) and a modular hybrid retrieval system.
+Build a production-quality, modular self-correcting RAG workflow using LangGraph and LangChain, orchestrated by seven specialized reasoning agents and a dedicated formatting agent.
 
 ---
 
 ## 1. Directory Structure
 
+We will create the following files:
+
 ```text
-backend/app/services/
+backend/app/
 │
-├── parsers/
-│   ├── base_parser.py
-│   ├── pdf_parser.py
-│   ├── docx_parser.py
-│   ├── text_parser.py
-│   ├── markdown_parser.py
-│   └── parser_factory.py
+├── prompts/
+│   ├── query_understanding.txt
+│   ├── context_evaluation.txt
+│   ├── query_rewrite.txt
+│   ├── response_generation.txt
+│   ├── reflection.txt
+│   └── evidence_verification.txt
 │
-├── preprocessing/
-│   └── cleaner.py
+├── services/
+│   └── agents/
+│       ├── base_agent.py
+│       ├── query_understanding.py
+│       ├── retrieval_agent.py
+│       ├── context_evaluation.py
+│       ├── query_rewrite.py
+│       ├── response_generation.py
+│       ├── reflection.py
+│       ├── evidence_verification.py
+│       └── citation_agent.py
 │
-├── chunking/
-│   └── recursive_chunker.py
-│
-├── embeddings/
-│   └── embedding_service.py
-│
-├── vectorstore/
-│   └── qdrant_service.py
-│
-├── retrieval/
-│   ├── semantic.py
-│   ├── keyword.py
-│   ├── rrf.py
-│   └── retrieval_service.py
-│
-└── pipeline/
-    └── ingestion_pipeline.py
+└── workflows/
+    └── langgraph/
+        ├── state.py
+        ├── nodes.py
+        ├── router.py
+        └── graph.py
 ```
 
 ---
 
-## 2. Pipeline Phase Details & Improvisations
+## 2. Multi-Agent Graph Architecture (Improvised)
 
-### Step 1 — Parsing (`parsers/`)
-* Support PDF, DOCX, TXT, and Markdown.
-* Implement a unified interface using `BaseParser` returning a structured `ParsedDocument` containing `text` (full body), `pages` (list of page indexes and text), and `metadata`.
-* **Improvisation**: Graceful fallbacks in parser factory. If parsing fails, fall back to basic text decoding representation to prevent system crashes on corrupted formats.
-
-### Step 2 — Cleaning (`preprocessing/`)
-* **Improvisation**: Explicit cleaning rules:
-  1. *Unicode Normalization*: Convert all characters to compatibility form (NFKC).
-  2. *Whitespace Consolidation*: Replace consecutive spaces/tabs with single spaces, preserving double newlines for paragraph boundaries.
-  3. *Ligature Resolution*: Translate ligatures (e.g., `ﬀ` -> `ff`, `ﬁ` -> `fi`) to ensure word matches.
-  4. *Hyphen Joining*: Strip line-ending hyphens split by paragraph text wrapping.
-
-### Step 3 — Chunking (`chunking/`)
-* Split text character-wise using recursive splits: `["\n\n", "\n", " ", ""]`.
-* Chunk sizes: **800–1000 characters** with an overlap of **100–150 characters**.
-
-### Step 4 — Embeddings (`embeddings/`)
-* Embedding Model: `BAAI/bge-small-en-v1.5` (384 dimensions).
-* **Improvisation**: Thread-safe model caching. Load the SentenceTransformer model once on application startup as a global singleton.
-* Expose `embed_documents(texts: List[str]) -> List[List[float]]` and `embed_query(text: str) -> List[float]`.
-
-### Step 5 — Vector Store (`vectorstore/`)
-* **Improvisation**: Auto-initialization. On start, inspect Qdrant for collection `veritas_chunks`. Create it dynamically using Cosine distance if absent.
-* Upload payloads in batches of 32 for low-memory, fast HTTP operations.
-
-### Step 6 — Hybrid Retrieval (`retrieval/`)
-* **Semantic**: Fetches top-k dense vector candidates from Qdrant.
-* **Keyword**: Lexical matcher (queries Qdrant payload text-search index).
-* **RRF**: Merges matches using Reciprocal Rank Fusion:
-  $$RRF\_Score(d) = \sum_{m \in M} \frac{1}{60 + r_m(d)}$$
-  Where $r_m(d)$ is the rank of document $d$ in system $m$.
-
-### Step 7 — Asynchronous Background Ingestion (`pipeline/`)
-* **Improvisation**: Triggered using FastAPI `BackgroundTasks`. The API immediately returns `202 Accepted` to free up the user interface.
-* State transitions recorded in database: `queued` -> `parsing` -> `cleaning` -> `chunking` -> `embedding` -> `indexing` -> `completed`/`failed`.
-* **Observability Ingestion Metrics**: Calculates and logs:
-  - `parse_latency_sec`
-  - `chunk_count`
-  - `embedding_latency_sec`
-  - `indexing_latency_sec`
-  - `total_ingestion_time_sec`
-  These are saved directly to `ProcessingJob` metadata or logs.
+```text
+                           User Query
+                                │
+                                ▼
+                       [Understand Intent]
+                                │
+          ┌─────────────────────┴─────────────────────┐
+     Out of Scope / Harmful                    In Scope & Valid
+          │                                           │
+          ▼                                           ▼
+   [Refusal / Clarify]                     [Hybrid Retrieval (RRF)]
+          │                                           │
+          │                                           ▼
+          │                                  [Evaluate Context]
+          │                                           │
+          │               ┌───────────────────────────┼───────────────────────────┐
+          │      Context Sufficient          Context Poor (Loop < 2)     No Context (Loop >= 2)
+          │               │                           │                           │
+          │               ▼                           ▼                           ▼
+          │       [Generate Answer]            [Rewrite Query]             [Refusal / Clarify]
+          │               │                           │                           │
+          │               ▼                           │                           │
+          │           [Reflect] ◄─────────────────────┘                           │
+          │               │                                                       │
+          │               ▼                                                       │
+          │     [Verify Against Evidence]                                         │
+          │               │                                                       │
+          │       ┌───────┴───────────────────────────┐                           │
+          │    Verified                        Not Verified                       │
+          │       │                                   │                           │
+          │       ▼                                   ▼                           │
+          │  [Citation Agent]             Retry (Loop < 2)?                       │
+          │       │                        ├── Yes ──> [Generate Answer]          │
+          │       │                        └── No  ──> [Refusal / Clarify]        │
+          │       │                                           │                   │
+          └───────┼───────────────────────────────────────────┴───────────────────┘
+                  ▼
+            Final Response
+```
 
 ---
 
-## 3. Verification Plan
+## 3. LangGraph State Schema (`workflows/langgraph/state.py`)
 
-* Upload a test document containing specific reference terms.
-* Inspect database logs to ensure latencies and metadata are populated.
-* Verify hybrid search API yields correct ranked results via test cases.
+We define `AgentState` containing search targets, parsed payloads, feedback loops, and metrics:
+
+```python
+from typing import TypedDict, List, Dict, Any
+
+class AgentState(TypedDict):
+    original_query: str
+    current_query: str
+    chat_history: List[Dict[str, str]]
+    
+    # Query Analysis
+    intent: str
+    entities: List[str]
+    search_keywords: List[str]
+    
+    # Context
+    retrieved_chunks: List[Dict[str, Any]]
+    relevant_chunks: List[Dict[str, Any]]
+    
+    # Responses & Evaluation
+    generated_answer: str
+    reflection_feedback: str
+    verification_feedback: str
+    verified_claims: List[Dict[str, Any]]
+    citations: List[Dict[str, Any]]
+    confidence_score: float
+    
+    # Loop Counters
+    rewrite_loop_count: int
+    reflection_loop_count: int
+    
+    # Status Flags
+    refusal: bool
+    execution_trace: List[str]
+```
+
+---
+
+## 4. Agent Responsibilities & Structured Parsers
+
+* **Base Agent (`base_agent.py`)**: Singleton Gemini LLM connector. Loads prompts dynamically from `app/prompts/` and implements automatic hot-reloading for developers.
+* **Query Understanding Agent (`query_understanding.py`)**: Classifies intent, entities, and keywords. Output validated by Pydantic.
+* **Retrieval Agent (`retrieval_agent.py`)**: Invokes database hybrid RRF retrieval (No LLM).
+* **Context Evaluation Agent (`context_evaluation.py`)**: Grades relevance of each context chunk individually.
+* **Query Rewrite Agent (`query_rewrite.py`)**: Reformulates query strings.
+* **Response Generation Agent (`response_generation.py`)**: Synthesizes responses based *only* on approved chunks.
+* **Reflection Agent (`reflection.py`)**: Inspects output for incompleteness and hallucinations.
+* **Evidence Verification Agent (`evidence_verification.py`)**: Cross-references answer details against raw facts to output a numeric confidence rating.
+* **Citation Agent (`citation_agent.py`)**: Maps source indices and formats citations (e.g. `[1] filename, page`).
+
+---
+
+## 5. Router Logic (`workflows/langgraph/router.py`)
+
+Transitions:
+1. `route_context`: Checks if `relevant_chunks` is populated. If empty and `rewrite_loop_count < 2`, route to `query_rewrite`. Otherwise, route to `response_generation` (if some chunks exist) or `refusal` (if no context is available).
+2. `route_verification`: Evaluates verification outputs. If verified, routes to `citation_agent`. If failed and `reflection_loop_count < 2`, routes back to `response_generation` for a retry using feedback. Otherwise, routes to `refusal`.
+
+---
+
+## 6. Observability Metrics
+Every node transition records latency, loop steps, and decisions to the `execution_trace` array to populate a detailed JSON response at the end of the query execution.

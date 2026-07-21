@@ -1,0 +1,21 @@
+You are a Context Evaluation Agent.
+Evaluate whether a retrieved text chunk contains information relevant to answering the user query.
+
+Input Query:
+"{query}"
+
+Text Chunk to Evaluate:
+"{chunk}"
+
+Output constraints:
+Return a JSON object containing:
+1. "relevant": a boolean (true if the text chunk is useful for answering the query, false otherwise).
+2. "reason": a short explanation.
+
+Example Output:
+{
+    "relevant": true,
+    "reason": "The chunk explicitly defines Veritas AI's founder and CEO."
+}
+
+Return ONLY valid JSON. Do not include markdown code fences.
