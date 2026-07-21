@@ -64,12 +64,19 @@ class BaseAgent:
         return BaseAgent._prompt_cache[prompt_filename]
 
     def call_llm(self, prompt: str) -> str:
-        """Helper to invoke the Gemini LLM with a given prompt."""
+        """Helper to invoke the LLM with a given prompt."""
         try:
             response = BaseAgent._llm_instance.invoke(prompt)
-            return response.content
+            content = response.content
+            # Convert list outputs (from some local model integrations) to string safely
+            if isinstance(content, list):
+                content = "".join([
+                    item.get("text", str(item)) if isinstance(item, dict) else str(item)
+                    for item in content
+                ])
+            return content
         except Exception as e:
-            logger.error(f"Error calling Gemini LLM: {str(e)}")
+            logger.error(f"Error calling LLM: {str(e)}")
             raise e
 
     def parse_json_response(self, text: str) -> Dict[str, Any]:

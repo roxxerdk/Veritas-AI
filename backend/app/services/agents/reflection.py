@@ -18,10 +18,11 @@ class ReflectionAgent(BaseAgent):
             for hit in relevant_chunks
         ])
         
-        prompt = prompt_template.format(
-            query=query,
-            context=context_str,
-            answer=answer
+        prompt = (
+            prompt_template
+            .replace("{query}", query)
+            .replace("{context}", context_str)
+            .replace("{answer}", answer)
         ) + "\nJSON Response:"
         
         response_text = self.call_llm(prompt)

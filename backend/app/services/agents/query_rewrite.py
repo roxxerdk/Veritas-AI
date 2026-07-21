@@ -7,10 +7,11 @@ class QueryRewriteAgent(BaseAgent):
         """Reformulates a search query to optimize hybrid retrieval performance."""
         prompt_template = self.load_prompt("query_rewrite")
         
-        # Inject the query parameters
-        prompt = prompt_template.format(
-            original_query=original_query,
-            current_query=current_query
+        # Inject the query parameters using .replace to avoid curly brace parsing errors
+        prompt = (
+            prompt_template
+            .replace("{original_query}", original_query)
+            .replace("{current_query}", current_query)
         ) + "\nJSON Response:"
         
         response_text = self.call_llm(prompt)

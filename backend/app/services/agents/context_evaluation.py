@@ -10,8 +10,12 @@ class ContextEvaluationAgent(BaseAgent):
         """Evaluates a single document chunk for relevance against the query."""
         prompt_template = self.load_prompt("context_evaluation")
         
-        # Inject context variables
-        prompt = prompt_template.format(query=query, chunk=chunk_content) + "\nJSON Response:"
+        # Inject context variables safely using .replace to prevent JSON curly brace conflicts
+        prompt = (
+            prompt_template
+            .replace("{query}", query)
+            .replace("{chunk}", chunk_content)
+        ) + "\nJSON Response:"
         
         try:
             response_text = self.call_llm(prompt)

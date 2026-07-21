@@ -28,8 +28,12 @@ class ResponseGenerationAgent(BaseAgent):
             
         context_str = "\n---\n".join(context_list)
         
-        # Inject standard variables
-        prompt = prompt_template.format(query=query, context=context_str)
+        # Inject variables using .replace to bypass formatting issues
+        prompt = (
+            prompt_template
+            .replace("{query}", query)
+            .replace("{context}", context_str)
+        )
         
         # If running a correction retry from reflection feedback, inject it
         if retry_feedback:

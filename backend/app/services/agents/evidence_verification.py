@@ -17,9 +17,10 @@ class EvidenceVerificationAgent(BaseAgent):
             for i, hit in enumerate(relevant_chunks)
         ])
         
-        prompt = prompt_template.format(
-            context=context_str,
-            answer=answer
+        prompt = (
+            prompt_template
+            .replace("{context}", context_str)
+            .replace("{answer}", answer)
         ) + "\nJSON Response:"
         
         response_text = self.call_llm(prompt)
