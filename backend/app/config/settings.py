@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # Gemini API Key
     GEMINI_API_KEY: str = Field(default="")
 
+    # Local LLM (Ollama)
+    LLM_PROVIDER: str = "gemini" # "gemini" or "ollama"
+    OLLAMA_MODEL: str = "qwen2.5-coder:7b"
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+
     def get_database_url(self) -> str:
         """Returns the PostgreSQL connection string."""
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

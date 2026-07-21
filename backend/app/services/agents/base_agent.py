@@ -4,6 +4,7 @@ import os
 import re
 from typing import Dict, Any, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_ollama import ChatOllama
 
 from app.config.settings import settings
 
@@ -13,26 +14,35 @@ PROMPTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 
 class BaseAgent:
     _prompt_cache: Dict[str, str] = {}
-    _llm_instance: Optional[ChatGoogleGenerativeAI] = None
+    _llm_instance: Optional[Any] = None
 
-    def __init__(self, model_name: str = "gemini-2.5-flash"):
+    def __init__(self, model_name: str = "gemini-flash-latest"):
         self.model_name = model_name
         self._init_llm()
 
     def _init_llm(self):
-        """Initializes the Gemini LLM client as a singleton."""
+        """Initializes the LLM client based on the selected provider."""
         if BaseAgent._llm_instance is None:
-            # Leverage settings api key, fallback to env variable
-            api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
-            if not api_key:
-                logger.warning("GEMINI_API_KEY is not defined. LLM operations will fail.")
-            
-            BaseAgent._llm_instance = ChatGoogleGenerativeAI(
-                model=self.model_name,
-                google_api_key=api_key,
-                temperature=0.0, # low temperature for predictable evaluation & responses
-                max_tokens=2048
-            )
+            if settings.LLM_PROVIDER == "ollama":
+                logger.info(f"Initializing local Ollama driver with model '{settings.OLLAMA_MODEL}'...")
+                BaseAgent._llm_instance = ChatOllama(
+                    model=settings.OLLAMA_MODEL,
+                    base_url=settings.OLLAMA_BASE_URL,
+                    temperature=0.0
+                )
+            else:
+                # Leverage settings api key, fallback to env variable
+                api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
+                if not api_key:
+                    logger.warning("GEMINI_API_KEY is not defined. LLM operations will fail.")
+                
+                logger.info(f"Initializing Gemini driver with model '{self.model_name}'...")
+                BaseAgent._llm_instance = ChatGoogleGenerativeAI(
+                    model=self.model_name,
+                    google_api_key=api_key,
+                    temperature=0.0, # low temperature for predictable evaluation & responses
+                    max_tokens=2048
+                )
 
     def load_prompt(self, prompt_filename: str) -> str:
         """Loads a prompt template from disk, supporting hot-reloading during debug mode."""
