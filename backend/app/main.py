@@ -7,6 +7,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.health import router as health_router
+from app.api.auth import router as auth_router
 from app.config.settings import settings
 
 # Setup logging configuration
@@ -21,7 +22,6 @@ logger = logging.getLogger("veritas-ai")
 async def lifespan(app: FastAPI):
     # Startup tasks
     logger.info("Initializing Veritas AI Backend Services...")
-    # Ready to initialize clients (e.g. Qdrant connection pool, Redis pool) if needed
     yield
     # Shutdown tasks
     logger.info("Shutting down Veritas AI Backend Services...")
@@ -77,6 +77,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include Routers
 app.include_router(health_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 
 
 @app.get("/")
