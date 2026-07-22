@@ -40,9 +40,15 @@ def retrieval_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
         raise ValueError("Database session missing from LangGraph config parameters.")
         
     agent = RetrievalAgent(db)
-    # Search using combined search keywords
-    query_str = " ".join(state["search_keywords"])
+    # Search using combined search keywords, fallback to original query
+    keywords = state.get("search_keywords", [])
+    query_str = " ".join(keywords) if keywords else state["original_query"]
     chunks = agent.retrieve(query=query_str, top_k=5)
+    
+    # Fallback: if keyword search returned 0 hits, query using the full original query
+    if not chunks and query_str != state["original_query"]:
+        chunks = agent.retrieve(query=state["original_query"], top_k=5)
+        
     latency = time.time() - start_time
     
     trace_msg = f"[Retrieval Agent] Fetched {len(chunks)} candidate text chunks from vector store ({latency:.2f}s)"

@@ -46,4 +46,11 @@ class ContextEvaluationAgent(BaseAgent):
             if result["relevant"]:
                 relevant_chunks.append(hit)
                 
+        # Fallback: if no chunks passed strict grading but candidates exist,
+        # keep top candidate chunks so summary & broad queries can synthesize a response
+        if not relevant_chunks and chunks:
+            logger.info("Context evaluation returned 0 relevant chunks; falling back to top candidate chunks.")
+            relevant_chunks = chunks[:3]
+
         return relevant_chunks
+
