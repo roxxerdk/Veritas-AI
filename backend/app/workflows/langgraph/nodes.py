@@ -42,12 +42,31 @@ def retrieval_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
         
     agent = RetrievalAgent(db)
     
-    # Fetch document IDs belonging strictly to the active user to isolate search scope
+    # Fetch document IDs belonging strictly to the active user to isolate search scope, ordered by newest first
     from app.models.document import Document
     filter_dict = None
     if user_id:
-        doc_ids = [d.id for d in db.query(Document).filter(Document.uploaded_by == user_id).all()]
-        filter_dict = {"document_id": doc_ids}
+        user_docs = (
+            db.query(Document)
+            .filter(Document.uploaded_by == user_id, Document.status == "completed")
+            .order_by(Document.created_at.desc())
+            .all()
+        )
+        doc_ids = [d.id for d in user_docs]
+        
+        if doc_ids:
+            # If the user is asking about a single document (e.g. "this document", "uploaded file"),
+            # isolate context strictly to their most recently uploaded file.
+            generic_keywords = ["uploaded document", "this document", "my document", "the pdf", "my pdf", "uploaded pdf", "the file"]
+            query_lower = query_str.lower()
+            is_generic = any(keyword in query_lower for keyword in generic_keywords)
+            
+            if is_generic:
+                filter_dict = {"document_id": [doc_ids[0]]}
+            else:
+                filter_dict = {"document_id": doc_ids}
+        else:
+            filter_dict = {"document_id": []}
         
     # Search using combined search keywords, fallback to original query
     keywords = state.get("search_keywords", [])

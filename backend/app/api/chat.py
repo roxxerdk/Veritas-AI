@@ -109,8 +109,8 @@ async def process_chat_query(
     }
 
     try:
-        # Run graph providing active db session via context variables
-        config = {"configurable": {"db": db}}
+        # Run graph providing active db session and authenticated user id via context variables
+        config = {"configurable": {"db": db, "user_id": current_user.id}}
         final_state = app_graph.invoke(initial_state, config=config)
     except Exception as e:
         # Roll back and throw HTTP error if agent execution crashes
