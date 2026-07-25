@@ -70,14 +70,15 @@ async def upload_document(
     local_filename = f"{checksum}.{file_ext}"
     storage_path = os.path.join(UPLOAD_DIR, local_filename)
 
-    # Write file content to local storage
+    # Write file content to storage
     try:
-        with open(storage_path, "wb") as f:
-            f.write(contents)
+        from app.services.storage.storage_service import StorageService
+        storage_service = StorageService()
+        storage_path = storage_service.save_file(contents, local_filename)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Could not save document locally: {str(e)}"
+            detail=f"Could not save document: {str(e)}"
         )
 
     # Save Document record to DB
@@ -124,7 +125,7 @@ def delete_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Deletes a document from local store, database, and Qdrant vector index."""
+    """Deletes a document from storage, database, and Qdrant vector index."""
     # Look up document by ID and verify ownership
     doc = db.query(Document).filter(
         Document.id == document_id,
@@ -137,12 +138,13 @@ def delete_document(
             detail="Document not found or access denied."
         )
 
-    # Delete local file from disk
-    if os.path.exists(doc.storage_path):
-        try:
-            os.remove(doc.storage_path)
-        except Exception:
-            pass
+    # Delete file from storage (local disk or S3)
+    try:
+        from app.services.storage.storage_service import StorageService
+        storage_service = StorageService()
+        storage_service.delete_file(doc.storage_path)
+    except Exception:
+        pass
 
     # Clear vectors from Qdrant
     try:

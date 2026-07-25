@@ -25,6 +25,15 @@ logger = logging.getLogger("veritas-ai")
 async def lifespan(app: FastAPI):
     # Startup tasks
     logger.info("Initializing Veritas AI Backend Services...")
+    
+    # Load LangSmith tracing environment variables dynamically on startup
+    import os
+    if settings.LANGCHAIN_API_KEY:
+        os.environ["LANGCHAIN_TRACING_V2"] = settings.LANGCHAIN_TRACING_V2
+        os.environ["LANGCHAIN_API_KEY"] = settings.LANGCHAIN_API_KEY
+        os.environ["LANGCHAIN_PROJECT"] = settings.LANGCHAIN_PROJECT
+        logger.info(f"LangSmith Observability active. Tracing project: {settings.LANGCHAIN_PROJECT}")
+        
     yield
     # Shutdown tasks
     logger.info("Shutting down Veritas AI Backend Services...")
