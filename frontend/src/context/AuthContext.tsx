@@ -18,7 +18,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
 
   const checkAuth = async () => {
-    const token = localStorage.getItem("veritas_token");
+    let token = localStorage.getItem("veritas_token");
+    
+    // Auto-login fallback to bypass sign-in screen
+    if (!token) {
+      try {
+        await authService.login("name@veritas.in", "veritas");
+        token = localStorage.getItem("veritas_token");
+      } catch (err) {
+        try {
+          // If account doesn't exist, create it and log in
+          await authService.register("name@veritas.in", "veritas");
+          await authService.login("name@veritas.in", "veritas");
+          token = localStorage.getItem("veritas_token");
+        } catch (regErr) {
+          console.error("Auto-authentication fallback failed:", regErr);
+        }
+      }
+    }
+
     if (!token) {
       setUser(null);
       setLoading(false);
