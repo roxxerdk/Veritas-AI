@@ -18,8 +18,23 @@ def get_password_hash(password: str) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifies a plain password against its bcrypt hashed representation."""
+    """Verifies a plain password, supporting both new bcrypt and legacy PBKDF2 hashes."""
     try:
+        # Check if it is the legacy PBKDF2 format containing a colon separator
+        if ":" in hashed_password:
+            import hashlib
+            salt_hex, hash_hex = hashed_password.split(":")
+            salt = bytes.fromhex(salt_hex)
+            expected_hash = bytes.fromhex(hash_hex)
+            pwd_hash = hashlib.pbkdf2_hmac(
+                "sha256",
+                plain_password.encode("utf-8"),
+                salt,
+                iterations=100000
+            )
+            return pwd_hash == expected_hash
+
+        # Standard bcrypt check
         return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
     except Exception:
         return False
