@@ -22,6 +22,9 @@ export const authService = {
     if (response.data.access_token) {
       localStorage.setItem("veritas_token", response.data.access_token);
     }
+    if (response.data.refresh_token) {
+      localStorage.setItem("veritas_refresh_token", response.data.refresh_token);
+    }
     return response.data;
   },
 
@@ -32,5 +35,6 @@ export const authService = {
 
   logout() {
     localStorage.removeItem("veritas_token");
+    localStorage.removeItem("veritas_refresh_token");
   }
 };
