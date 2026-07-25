@@ -45,10 +45,10 @@ async def upload_document(
     # Check if file format is supported
     filename = file.filename
     file_ext = os.path.splitext(filename)[1].lower().replace(".", "")
-    if file_ext not in ["pdf", "docx", "txt", "md"]:
+    if file_ext not in ["pdf", "docx", "txt", "md", "png", "jpg", "jpeg"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file format: '.{file_ext}'. Supported formats are: PDF, DOCX, TXT, MD"
+            detail=f"Unsupported file format: '.{file_ext}'. Supported formats are: PDF, DOCX, TXT, MD, PNG, JPG, JPEG"
         )
 
     # Read file content to generate checksum

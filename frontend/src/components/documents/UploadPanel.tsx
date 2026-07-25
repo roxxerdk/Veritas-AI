@@ -27,8 +27,8 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ onUploadSuccess }) => 
   const uploadFile = async (file: File) => {
     // Validate file extension
     const ext = file.name.split(".").pop()?.toLowerCase();
-    if (!ext || !["pdf", "docx", "txt", "md"].includes(ext)) {
-      setError("Unsupported file format. Please upload PDF, DOCX, TXT, or MD.");
+    if (!ext || !["pdf", "docx", "txt", "md", "png", "jpg", "jpeg"].includes(ext)) {
+      setError("Unsupported file format. Please upload PDF, DOCX, TXT, MD, PNG, JPG, or JPEG.");
       return;
     }
 
@@ -82,14 +82,14 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ onUploadSuccess }) => 
         onClick={() => fileInputRef.current?.click()}
         className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all ${
           isDragActive
-            ? "border-indigo-500 bg-indigo-500/5"
-            : "border-slate-800 hover:border-slate-700 bg-slate-900/30 hover:bg-slate-900/50"
+             ? "border-indigo-500 bg-indigo-500/5"
+             : "border-slate-800 hover:border-slate-700 bg-slate-900/30 hover:bg-slate-900/50"
         }`}
       >
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.docx,.txt,.md"
+          accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg"
           className="hidden"
           onChange={handleFileChange}
           disabled={uploading}
@@ -99,7 +99,7 @@ export const UploadPanel: React.FC<UploadPanelProps> = ({ onUploadSuccess }) => 
         <p className="text-sm font-medium text-slate-300 text-center mb-1">
           {uploading ? "Uploading file..." : "Drag & drop file here, or click to browse"}
         </p>
-        <p className="text-xs text-slate-500">PDF, DOCX, TXT, or MD up to 25MB</p>
+        <p className="text-xs text-slate-500">PDF, DOCX, TXT, MD, PNG, JPG, or JPEG up to 25MB</p>
 
         {uploading && (
           <div className="w-full mt-4 max-w-xs">
