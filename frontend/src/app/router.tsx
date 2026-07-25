@@ -9,7 +9,7 @@ import { Settings } from "../pages/Settings";
 
 // Route protection decorator
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, checkAuth } = useAuth();
   const token = localStorage.getItem("veritas_token");
 
   if (loading) {
@@ -20,24 +20,18 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     );
   }
 
-  // If no token or user profile found, redirect to Login
+  // If no token or user profile found, display a connecting screen and trigger auto-retry
   if (!token || !user) {
-    return <Navigate to="/login" replace />;
-  }
+    // Auto-retry checkAuth after a short delay if it fails
+    setTimeout(() => {
+      checkAuth();
+    }, 2000);
 
-  return <>{children}</>;
-};
-
-// Route protection decorator for Auth Pages (Login/Register)
-const AuthRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
-  const token = localStorage.getItem("veritas_token");
-
-  if (loading) return null;
-
-  // If already authenticated, redirect straight to dashboard
-  if (token && user) {
-    return <Navigate to="/dashboard" replace />;
+    return (
+      <div className="bg-slate-950 min-h-screen flex items-center justify-center text-sm text-slate-500 font-mono flex-col gap-2">
+        <span className="animate-pulse">Establishing connection to Veritas AI services...</span>
+      </div>
+    );
   }
 
   return <>{children}</>;
@@ -46,23 +40,9 @@ const AuthRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 export const AppRouter: React.FC = () => {
   return (
     <Routes>
-      {/* Public/Auth Routes */}
-      <Route
-        path="/login"
-        element={
-          <AuthRoute>
-            <Login />
-          </AuthRoute>
-        }
-      />
-      <Route
-        path="/register"
-        element={
-          <AuthRoute>
-            <Register />
-          </AuthRoute>
-        }
-      />
+      {/* Redirect Auth routes to Dashboard root */}
+      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/register" element={<Navigate to="/" replace />} />
 
       {/* Protected Control Views */}
       <Route
