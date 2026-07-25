@@ -42,7 +42,11 @@ def retrieval_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
         
     agent = RetrievalAgent(db)
     
-    # Fetch document IDs belonging strictly to the active user to isolate search scope, ordered by newest first
+    # 1. Search using combined search keywords, fallback to original query
+    keywords = state.get("search_keywords", [])
+    query_str = " ".join(keywords) if keywords else state["original_query"]
+    
+    # 2. Fetch document IDs belonging strictly to the active user to isolate search scope, ordered by newest first
     from app.models.document import Document
     filter_dict = None
     if user_id:
@@ -68,9 +72,6 @@ def retrieval_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
         else:
             filter_dict = {"document_id": []}
         
-    # Search using combined search keywords, fallback to original query
-    keywords = state.get("search_keywords", [])
-    query_str = " ".join(keywords) if keywords else state["original_query"]
     chunks = agent.retrieve(query=query_str, top_k=5, filter_dict=filter_dict)
     
     # Fallback: if keyword search returned 0 hits, query using the full original query
