@@ -9,7 +9,12 @@ class KeywordRetriever:
     def __init__(self, db: Session):
         self.db = db
 
-    def retrieve(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def retrieve(
+        self,
+        query: str,
+        top_k: int = 5,
+        filter_dict: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
         """Queries the SQL database for document chunks matching keyword search constraints."""
         if not query:
             return []
@@ -26,13 +31,19 @@ class KeywordRetriever:
             conditions.append(DocumentChunk.content.ilike(f"%{term}%"))
 
         # Query matches and join with Document to fetch metadata payload
-        results = (
+        query_obj = (
             self.db.query(DocumentChunk, Document.filename)
             .join(Document, DocumentChunk.document_id == Document.id)
             .filter(or_(*conditions))
-            .limit(top_k)
-            .all()
         )
+        
+        # Apply document scope filter if present
+        if filter_dict and "document_id" in filter_dict:
+            doc_ids = filter_dict["document_id"]
+            if doc_ids:
+                query_obj = query_obj.filter(DocumentChunk.document_id.in_(doc_ids))
+
+        results = query_obj.limit(top_k).all()
 
         formatted_results = []
         for idx, (chunk, filename) in enumerate(results):

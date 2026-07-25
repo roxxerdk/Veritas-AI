@@ -39,7 +39,8 @@ class RetrievalService:
         # 2. Fetch Keyword search candidates
         keyword_hits = self.keyword_retriever.retrieve(
             query=query,
-            top_k=top_k * 2
+            top_k=top_k * 2,
+            filter_dict=filter_dict
         )
 
         # 3. Fuse lists using RRF

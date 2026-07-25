@@ -66,9 +66,24 @@ class QdrantService:
     ) -> List[Dict[str, Any]]:
         """Performs a dense vector semantic search query in Qdrant using the unified query_points API."""
         try:
+            query_filter = None
+            if filter_dict and "document_id" in filter_dict:
+                doc_ids = filter_dict["document_id"]
+                if doc_ids:
+                    from qdrant_client.models import Filter, FieldCondition, MatchAny
+                    query_filter = Filter(
+                        must=[
+                            FieldCondition(
+                                key="document_id",
+                                match=MatchAny(any=doc_ids)
+                            )
+                        ]
+                    )
+            
             response = self.client.query_points(
                 collection_name=COLLECTION_NAME,
                 query=query_vector,
+                query_filter=query_filter,
                 limit=top_k,
                 with_payload=True
             )
